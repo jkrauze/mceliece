@@ -25,17 +25,6 @@ class McElieceCipher:
         self.g_poly = None
 
     def generate_random_keys(self):
-        global a, b
-        ring = GF2mRing(4, GF2Poly.from_list([1, 1, 0, 0, 1]))
-        a = GF2mPoly.from_list(
-            [GF2m(GF2Poly.from_list([0]), ring), GF2m(GF2Poly.from_list([0, 1]), ring)])
-        b = GF2mPoly.from_list(
-            [GF2m(GF2Poly.from_list([0, 1, 0, 1]), ring), GF2m(GF2Poly.from_list([1]), ring),
-             GF2m(GF2Poly.from_list([1, 0, 1]), ring), GF2m(GF2Poly.from_list([0, 1, 1]), ring)])
-        print(a)
-        print(b)
-        print(ext_euclid_poly(a, b, ring))
-        print(timeit.timeit('divmod(b,a)', number=10000, globals=globals()))
         self.G, self.H, self.g_poly, self.irr_poly = GoppaCodeGenerator(self.m, self.n, self.t).gen()
         self.g_poly = np.array([(Poly(e, alpha) % self.irr_poly).trunc(2).all_coeffs()[::-1] for e in
                                 self.g_poly.all_coeffs()[::-1]])

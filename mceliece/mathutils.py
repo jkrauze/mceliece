@@ -223,7 +223,6 @@ def ext_euclid_poly(a, b, ring):
                      GF2mPoly.from_list([GF2m(GF2Poly.from_list([1]), ring)]), \
                      GF2mPoly.from_list([GF2m(GF2Poly.from_list([0]), ring)])
     while not b.is_zero():
-        print(a, b)
         q, r = divmod(a, b)
         x = x2 - q * x1
         y = y2 - q * y1
@@ -373,8 +372,6 @@ class GF2m:
         if self.n.is_zero():
             return self
         if (type(other) is int and other == 0) or other.n.is_zero():
-            print(self)
-            print(other)
             raise Exception("Dividing by zero!")
         return GF2m(GF2Poly.from_list(
             self.ring.elem((self.ring.size + self.ring.pow(self.n) - self.ring.pow(other.n)) % self.ring.size)),
