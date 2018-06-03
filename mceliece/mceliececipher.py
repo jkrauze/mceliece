@@ -28,7 +28,7 @@ class McElieceCipher:
         global a, b
         ring = GF2mRing(4, GF2Poly.from_list([1, 1, 0, 0, 1]))
         a = GF2mPoly.from_list(
-            [GF2m(GF2Poly.from_list([]), ring), GF2m(GF2Poly.from_list([0, 1]), ring)])
+            [GF2m(GF2Poly.from_list([0]), ring), GF2m(GF2Poly.from_list([0, 1]), ring)])
         b = GF2mPoly.from_list(
             [GF2m(GF2Poly.from_list([0, 1, 0, 1]), ring), GF2m(GF2Poly.from_list([1]), ring),
              GF2m(GF2Poly.from_list([1, 0, 1]), ring), GF2m(GF2Poly.from_list([0, 1, 1]), ring)])
@@ -60,21 +60,13 @@ class McElieceCipher:
         log.debug(f"C': {Cp}")
         return Cp
 
-    def decode(self, msg_arr):
-        syndrome = msg_arr * GF2Matrix.from_list(self.H.T)
-        log.info(f'syndrome:\n{syndrome}')
+    def repair_errors(self, msg_arr, syndrome):
         self.irr_poly = GF2Poly.from_numpy(self.irr_poly)
         ring = GF2mRing(4, self.irr_poly)
         self.g_poly = GF2mPoly.from_list(
             [GF2m(GF2Poly.from_list([int(e) for e in coeff]), ring) for coeff in self.g_poly])
-        print(self.irr_poly)
-        print(self.g_poly)
-        global a, b
-        ring = GF2mRing(4, GF2Poly.from_list([1, 1, 0, 0, 1]))
-        a = GF2mPoly.from_list(
-            [GF2m(GF2Poly.from_list([0, 1]), ring), GF2m(GF2Poly.from_list([1]), ring)])
-        print(f"AAAAA:{a}")
-        print((a * a.inv_mod(self.g_poly)) % self.g_poly)
+        log.debug(f'irr_poly:{self.irr_poly}')
+        log.debug(f'g_poly:{self.g_poly}')
 
         S_poly = GF2mPoly.from_list(
             [GF2m(GF2Poly.from_list([int(e) for e in syndrome[i * self.m:(i + 1) * self.m].flat]), ring) for i in
@@ -84,13 +76,65 @@ class McElieceCipher:
         log.debug(f'S_inv_poly={S_inv_poly}')
         log.debug(f'S_poly*S_inv_poly (mod g_poly: {self.g_poly})={(S_poly*S_inv_poly)%self.g_poly}')
 
-        H_poly = S_inv_poly + GF2mPoly.from_list(
-            [GF2m(GF2Poly.from_list([]), ring), GF2m(GF2Poly.from_list([1]), ring)])
-        log.debug(f'H_poly={H_poly}')
+        if S_inv_poly.degree() == 1 and S_inv_poly[1].n.degree() == 0 and S_inv_poly[1].n.poly.coeffs()[0] == 1:
+            tau_poly = S_inv_poly
+        else:
+            g0, g1 = self.g_poly.split()
 
-        tau_poly = (H_poly ** (1/2))%self.g_poly
+            log.debug(f"g0:{g0};g1:{g1}")
+            log.debug(f"g0^2 + z*g1^2 :{g0**2 + GF2mPoly.x(ring)*g1**2}")
+            log.debug(f'g1_inv:{g1.inv_mod(self.g_poly)}')
+
+            w = g0 * g1.inv_mod(self.g_poly)
+            log.debug(f"w:{w}")
+
+            H_poly = S_inv_poly + GF2mPoly.from_list(
+                [GF2m(GF2Poly.from_list([0]), ring), GF2m(GF2Poly.from_list([1]), ring)])
+            log.debug(f'H_poly={H_poly}')
+
+            H0, H1 = H_poly.split()
+            log.debug(f'H0={H0};H1={H1}')
+
+            R = H0 + w * H1
+
+            log.debug(f'R:{R}')
+            log.debug(f'R^2 mod g:{(R**2)%self.g_poly}')
+
+            b, _, a = ext_euclid_poly(R, self.g_poly, ring)
+
+            log.debug(f'a:{a};b:{b}')
+            log.debug(f'b*R mod g:{(b*R)%self.g_poly}')
+
+            tau_poly = a ** 2 + GF2mPoly.x(ring) * b ** 2
+
+
+        test_elem = ring.one()
+        for i in range(len(msg_arr)):
+            value = tau_poly.eval(test_elem)
+            print(np.array(test_elem.n.poly.coeffs()).astype(int))
+            log.debug(f't(alpha^{np.packbits(np.array(test_elem.n.poly.coeffs(), dtype=int))})={value}')
+            if value == 0:
+                msg_arr[i] = msg_arr[i].flip()
+                log.info(f"REPAIRED ERROR ON {i}th POSITION")
+            test_elem = test_elem * ring.alpha()
+
         log.debug(f'tau_poly={tau_poly}')
+        return msg_arr
 
+
+    def decode(self, msg_arr):
+        log.debug(f'msg_len:{len(msg_arr)}')
+        syndrome = msg_arr * GF2Matrix.from_list(self.H.T)
+        log.info(f'syndrome:\n{syndrome}')
+        if not all(syndrome.arr == 0):
+            msg_arr = self.repair_errors(msg_arr, syndrome)
+
+        D = GF2Matrix.from_list(np.append(self.G.T, msg_arr.arr.reshape(len(msg_arr),1), axis=1))
+        log.debug(f'G^T|c=')
+        D_rref = rref(D, steps=self.G.shape[0])
+        log.debug(f'I|m=\n{D_rref}')
+
+        return GF2Matrix.from_list(D_rref[:self.G.shape[0],self.G.shape[0]:].flatten())
 
     def decrypt(self, msg_arr):
         if len(msg_arr) != self.H.shape[1]:
@@ -100,6 +144,6 @@ class McElieceCipher:
         log.debug(f"C': {Cp}")
         Mp = self.decode(Cp)
         log.debug(f"m': {Mp}")
-        M = Mp * self.S_inv
+        M = Mp * GF2Matrix.from_list(self.S_inv)
         log.debug(f"msg: {M}")
-        return M
+        return M.to_numpy()

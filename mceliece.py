@@ -53,7 +53,7 @@ def encrypt(pub_key_file, input_arr, bin_output=False, block=False):
 
     if not block:
         if mceliece.Gp.shape[0] < len(input_arr):
-            raise Exception("Input is too large for current N")
+            raise Exception(f"Input is too large for current N. Should be {mceliece.Gp.shape[0]}")
         output = mceliece.encrypt(input_arr).to_numpy()
     else:
         input_arr = padding_encode(input_arr, ntru.N)
@@ -85,9 +85,7 @@ def decrypt(priv_key_file, input_arr, bin_input=False, block=False):
     mceliece.P_inv = priv_key['P_inv']
     mceliece.g_poly = priv_key['g_poly']
     mceliece.irr_poly = priv_key['irr_poly']
-    if len(input_arr) < mceliece.H.shape[1]:
-        input_arr = np.pad(input_arr, (0, mceliece.H.shape[1] - len(input_arr)), 'constant')
-    mceliece.decrypt(input_arr)
+
 
     if bin_input:
         k = int(math.log2(ntru.q))
@@ -97,10 +95,9 @@ def decrypt(priv_key_file, input_arr, bin_input=False, block=False):
         input_arr = np.array([int("".join(n.astype(str)), 2) for n in
                               np.pad(np.array(input_arr), (0, pad), 'constant').reshape((-1, k))])
     if not block:
-        if mceliece.G.shape[0] < len(input_arr):
-            raise Exception("Input is too large for current N")
-        log.info("POLYNOMIAL DEGREE: {}".format(max(0, len(input_arr) - 1)))
-        return ntru.decrypt(Poly(input_arr[::-1], x).set_domain(ZZ)).all_coeffs()[::-1]
+        if len(input_arr) < mceliece.H.shape[1]:
+            input_arr = np.pad(input_arr, (0, mceliece.H.shape[1] - len(input_arr)), 'constant')
+        return mceliece.decrypt(input_arr)
 
     input_arr = input_arr.reshape((-1, ntru.N))
     output = np.array([])

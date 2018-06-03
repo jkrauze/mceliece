@@ -46,15 +46,18 @@ class GoppaCodeGenerator:
         if g_poly.degree() < self.t:
             small_irr = None
             for i in range(100):
-                small_irr = irreducible_poly_ext_candidate(self.t - g_poly.degree(), irr_poly, self.q, x)
+                small_irr = irreducible_poly_ext_candidate(self.t - g_poly.degree(), irr_poly, self.q, x, non_roots=g_non_roots)
                 log.debug(f"irr_part_of_g={small_irr}")
                 if small_irr.eval(0).is_zero or small_irr.eval(1).is_zero:
+                    log.debug(f'roots in trivial case 0:{small_irr.eval(0)} 1:{small_irr.eval(1)}')
                     continue
                 first_root = first_alpha_power_root(small_irr, irr_poly, self.q)
                 if first_root > 0:
                     log.debug(f"alpha^{first_root} is a root of g(x)={small_irr}")
                     continue
                 break
+            else:
+                raise Exception("irr poly not found")
             g_poly = (g_poly * small_irr).trunc(self.q)
 
         g_poly = reduce_to_alpha_power(g_poly, irr_poly, ring, self.q)

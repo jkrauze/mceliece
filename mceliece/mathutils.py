@@ -11,10 +11,12 @@ import flint
 log = logging.getLogger("mathutils")
 
 
-def irreducible_poly_ext_candidate(m, irr_poly, p, var):
+def irreducible_poly_ext_candidate(m, irr_poly, p, var, non_roots=None):
     elems = [0, 1, alpha]
+    for e in non_roots:
+        elems.append(alpha ** e)
     return Poly(np.concatenate([np.random.choice(elems[1:], size=1, replace=True),
-                                np.random.choice(elems, size=m, replace=True, p=[0.9, 0.05, 0.05])], axis=0), var)
+                                np.random.choice(elems, size=m, replace=True)], axis=0), var)
 
 
 def irreducible_poly(m, p, var):
@@ -212,13 +214,16 @@ def ext_euclid_poly(a, b, ring):
         return (y, x, d)
 
     if b.degree() == 0:
-        return (GF2m(GF2Poly.from_list([1]), ring), GF2m(GF2Poly.from_list([]), ring), a)
+        return (GF2mPoly.from_list(GF2m(GF2Poly.from_list([1]), ring)),
+                GF2mPoly.from_list(GF2m(GF2Poly.from_list([0]), ring)),
+                a)
 
-    x1, x2, y1, y2 = GF2mPoly.from_list([GF2m(GF2Poly.from_list([]), ring)]), \
+    x1, x2, y1, y2 = GF2mPoly.from_list([GF2m(GF2Poly.from_list([0]), ring)]), \
                      GF2mPoly.from_list([GF2m(GF2Poly.from_list([1]), ring)]), \
                      GF2mPoly.from_list([GF2m(GF2Poly.from_list([1]), ring)]), \
-                     GF2mPoly.from_list([GF2m(GF2Poly.from_list([]), ring)])
+                     GF2mPoly.from_list([GF2m(GF2Poly.from_list([0]), ring)])
     while not b.is_zero():
+        print(a, b)
         q, r = divmod(a, b)
         x = x2 - q * x1
         y = y2 - q * y1
@@ -227,13 +232,16 @@ def ext_euclid_poly(a, b, ring):
     return (x2, y2, a)
 
 
-def rref(arr):
+def rref(arr, steps=None):
     m = len(arr)
     n = len(arr[0])
     assert all([len(row) == n for row in arr[1:]]), "Matrix rows have non-uniform length"
     log.debug("rref start:\n{}".format(arr))
 
-    for k in range(min(m, n)):
+    if steps is None:
+        steps = min(m, n)
+
+    for k in range(steps):
         i_max = -1
         for i in range(k, m):
             if arr[i, k].n > 0:
@@ -252,7 +260,7 @@ def rref(arr):
     log.debug("rref triangle:\n{}".format(arr))
     m = len(arr)
     n = len(arr[0])
-    for k in range(min(m, n) - 1, -1, -1):
+    for k in range(steps - 1, -1, -1):
         for i in range(k - 1, -1, -1):
             if arr[i, k].n != 0:
                 for l in range(k, n):
@@ -267,25 +275,39 @@ class GF2():
     def __init__(self, n):
         self.n = int(n)
 
-    def __add__(self, other): return GF2(self.n ^ other.n)
+    def __add__(self, other):
+        return GF2(self.n ^ other.n)
 
-    def __sub__(self, other): return GF2(self.n ^ other.n)
+    def __sub__(self, other):
+        return GF2(self.n ^ other.n)
 
-    def __mul__(self, other): return GF2(self.n & other.n)
+    def __mul__(self, other):
+        return GF2(self.n & other.n)
 
-    def __truediv__(self, other): return self * other.inv()
+    def __truediv__(self, other):
+        return self * other.inv()
 
-    def __neg__(self): return self
+    def __neg__(self):
+        return self
 
-    def __eq__(self, other): return isinstance(other, GF2) and self.n == other.n
+    def __eq__(self, other):
+        if isinstance(other, GF2):
+            return self.n == other.n
+        if self.n == int(other):
+            return True
+        return False
 
-    def __abs__(self): return abs(self.n)
+    def __abs__(self):
+        return abs(self.n)
 
-    def __str__(self): return str(self.n)
+    def __str__(self):
+        return str(self.n)
 
-    def __repr__(self): return self.__str__()
+    def __repr__(self):
+        return self.__str__()
 
-    def __int__(self): return self.n
+    def __int__(self):
+        return self.n
 
     def __divmod__(self, divisor):
         q, r = divmod(self.n, divisor.n)
@@ -315,6 +337,15 @@ class GF2mRing:
     def elem(self, pow):
         return self.element_dict[pow]
 
+    def zero(self):
+        return GF2m(GF2Poly.from_list([0]), self)
+
+    def one(self):
+        return GF2m(GF2Poly.from_list([1]), self)
+
+    def alpha(self):
+        return GF2m(GF2Poly.from_list([0, 1]), self)
+
 
 class GF2m:
 
@@ -332,7 +363,7 @@ class GF2m:
         if self.n.is_zero():
             return self
         if type(other) is int and other == 0:
-            return GF2m(GF2Poly.from_list([]), self.ring)
+            return GF2m(GF2Poly.from_list([0]), self.ring)
         if other.n.is_zero():
             return other
         return GF2m(GF2Poly.from_list(
@@ -342,16 +373,31 @@ class GF2m:
         if self.n.is_zero():
             return self
         if (type(other) is int and other == 0) or other.n.is_zero():
+            print(self)
+            print(other)
             raise Exception("Dividing by zero!")
         return GF2m(GF2Poly.from_list(
             self.ring.elem((self.ring.size + self.ring.pow(self.n) - self.ring.pow(other.n)) % self.ring.size)),
             self.ring)
 
+    def sqrt(self):
+        if self.n.is_zero():
+            return self
+        alpha_pow = self.ring.pow(self.n)
+        if alpha_pow % 2 == 1:
+            alpha_pow = alpha_pow + self.ring.size
+        alpha_pow = alpha_pow // 2
+        return GF2m(GF2Poly.from_list(self.ring.elem(alpha_pow)), self.ring)
+
     def __neg__(self):
         return self
 
     def __eq__(self, other):
-        return isinstance(other, GF2m) and self.n == other.n
+        if isinstance(other, GF2m):
+            return self.n == other.n
+        if self.n.is_zero() and other == 0:
+            return True
+        return False
 
     def __abs__(self):
         return abs(self.n)
@@ -520,24 +566,40 @@ class GF2mPoly:
     def from_list(list):
         return GF2mPoly(np.array(list))
 
+    @staticmethod
+    def from_elem(elem):
+        return GF2mPoly.from_list([elem])
+
+    @staticmethod
+    def x(ring):
+        return GF2mPoly.from_list([GF2m(GF2Poly.from_list([0]), ring), GF2m(GF2Poly.from_list([1]), ring)])
+
+    def _trim_zeros(self, val):
+        return np.trim_zeros(val, 'b') if len(val) > 1 else val
+
     def __add__(self, other):
-        return GF2mPoly(numpy.polynomial.polynomial.polyadd(self.poly, other.poly))
+        return GF2mPoly(self._trim_zeros(numpy.polynomial.polynomial.polyadd(self.poly, other.poly)))
 
     def __sub__(self, other):
-        return GF2mPoly(numpy.polynomial.polynomial.polyadd(self.poly, other.poly))
+        return GF2mPoly(self._trim_zeros(numpy.polynomial.polynomial.polyadd(self.poly, other.poly)))
 
     def __mul__(self, other):
-        return GF2mPoly(numpy.polynomial.polynomial.polymul(self.poly, other.poly))
+        if other == 0:
+            return GF2mPoly(self.poly[0].ring.zero())
+        return GF2mPoly(self._trim_zeros(numpy.polynomial.polynomial.polymul(self.poly, other.poly)))
 
     def __divmod__(self, other):
         result = numpy.polynomial.polynomial.polydiv(self.poly, other.poly)
-        return GF2mPoly(result[0]), GF2mPoly(result[1])
+        return GF2mPoly(self._trim_zeros(result[0])), GF2mPoly(self._trim_zeros(result[1]))
 
     def __truediv__(self, other):
         return self.__divmod__(other)[0]
 
     def __mod__(self, other):
         return self.__divmod__(other)[1]
+
+    def __pow__(self, power, modulo=None):
+        return GF2mPoly(self._trim_zeros(numpy.polynomial.polynomial.polypow(self.poly, power)))
 
     def __neg__(self):
         return self
@@ -576,5 +638,16 @@ class GF2mPoly:
         return len(self.poly) == 0 or all(e.n.is_zero() for e in self.poly.flat)
 
     def inv_mod(self, other):
+        if self.degree() == 0:
+            return GF2mPoly.from_list([self.poly[0].ring.one() / self.poly[0]])
         a, b, c = ext_euclid_poly(self, other, self.poly[0].ring)
         return a / c
+
+    def split(self):
+        p0_arr = np.sqrt(self.poly[0::2])
+        p1_arr = np.sqrt(self.poly[1::2])
+        if len(p1_arr) == 0:
+            p1_arr = np.array([self.poly[0].ring.zero()])
+        p0 = GF2mPoly(p0_arr)
+        p1 = GF2mPoly(p1_arr)
+        return p0, p1
