@@ -111,8 +111,7 @@ class McElieceCipher:
         test_elem = ring.one()
         for i in range(len(msg_arr)):
             value = tau_poly.eval(test_elem)
-            print(np.array(test_elem.n.poly.coeffs()).astype(int))
-            log.debug(f't(alpha^{np.packbits(np.array(test_elem.n.poly.coeffs(), dtype=int))})={value}')
+            log.debug(f't(alpha^{i})={value}')
             if value == 0:
                 msg_arr[i] = msg_arr[i].flip()
                 log.info(f"REPAIRED ERROR ON {i}th POSITION")
