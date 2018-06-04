@@ -30,12 +30,14 @@ def is_irreducible_poly(poly, p):
 def first_alpha_power_root(poly, irr_poly, p, elements_to_check=None):
     poly = Poly([(Poly(coeff, alpha) % irr_poly).trunc(p).as_expr() for coeff in poly.all_coeffs()], x)
     test_poly = Poly(1, alpha)
+    log.debug(f"testing f:{poly}")
     for i in range(1, p ** irr_poly.degree()):
         test_poly = (Poly(Poly(alpha, alpha) * test_poly, alpha) % irr_poly).set_domain(GF(p))
         if elements_to_check is not None and i not in elements_to_check:
             continue
-        log.debug(f"testing {i} {poly}: {test_poly}")
-        if Poly((Poly(poly.eval(test_poly.as_expr()), alpha) % irr_poly), alpha).trunc(p).is_zero:
+        value = Poly((Poly(poly.eval(test_poly.as_expr()), alpha) % irr_poly), alpha).trunc(p)
+        log.debug(f"testing alpha^{i} f({test_poly})={value}")
+        if value.is_zero:
             return i
     return -1
 
