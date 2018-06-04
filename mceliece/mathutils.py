@@ -216,14 +216,14 @@ def ext_euclid_poly(a, b, ring):
         return (y, x, d)
 
     if b.degree() == 0:
-        return (GF2mPoly.from_list(GF2m(GF2Poly.from_list([1]), ring)),
-                GF2mPoly.from_list(GF2m(GF2Poly.from_list([0]), ring)),
+        return (GF2mPoly.from_elem(ring.one()),
+                GF2mPoly.from_elem(ring.zero()),
                 a)
 
-    x1, x2, y1, y2 = GF2mPoly.from_list([GF2m(GF2Poly.from_list([0]), ring)]), \
-                     GF2mPoly.from_list([GF2m(GF2Poly.from_list([1]), ring)]), \
-                     GF2mPoly.from_list([GF2m(GF2Poly.from_list([1]), ring)]), \
-                     GF2mPoly.from_list([GF2m(GF2Poly.from_list([0]), ring)])
+    x1, x2, y1, y2 = GF2mPoly.from_elem(ring.zero()), \
+                     GF2mPoly.from_elem(ring.one()), \
+                     GF2mPoly.from_elem(ring.one()), \
+                     GF2mPoly.from_elem(ring.zero())
     while not b.is_zero():
         q, r = divmod(a, b)
         x = x2 - q * x1
