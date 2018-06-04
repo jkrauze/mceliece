@@ -34,8 +34,8 @@ class GoppaCodeGenerator:
 
         roots_num = max(0, self.q ** self.m - self.n - self.t)
 
-        g_roots = np.random.choice(range(1, self.q ** self.m - 1), roots_num, replace=False)
-        g_non_roots = list(set(range(1, self.q ** self.m - 1)) - set(g_roots))
+        g_roots = np.random.choice(range(self.q ** self.m - 1), roots_num, replace=False)
+        g_non_roots = list(set(range(self.q ** self.m - 1)) - set(g_roots))
 
         log.debug(f"g_roots({len(g_roots)})={g_roots}")
         log.debug(f"g_non_roots({len(g_non_roots)})={g_non_roots}")
