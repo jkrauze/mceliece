@@ -96,7 +96,7 @@ class McElieceCipher:
 
             tau_poly = a ** 2 + GF2mPoly.x(ring) * b ** 2
 
-
+        log.debug(f'tau_poly={tau_poly}')
         test_elem = ring.one()
         for i in range(len(msg_arr)):
             value = tau_poly.eval(test_elem)
@@ -106,9 +106,7 @@ class McElieceCipher:
                 log.info(f"REPAIRED ERROR ON {i}th POSITION")
             test_elem = test_elem * ring.alpha()
 
-        log.debug(f'tau_poly={tau_poly}')
         return msg_arr
-
 
     def decode(self, msg_arr):
         log.debug(f'msg_len:{len(msg_arr)}')
@@ -117,12 +115,12 @@ class McElieceCipher:
         if not all(syndrome.arr == 0):
             msg_arr = self.repair_errors(msg_arr, syndrome)
 
-        D = GF2Matrix.from_list(np.append(self.G.T, msg_arr.arr.reshape(len(msg_arr),1), axis=1))
+        D = GF2Matrix.from_list(np.append(self.G.T, msg_arr.arr.reshape(len(msg_arr), 1), axis=1))
         log.debug(f'G^T|c=')
         D_rref = rref(D, steps=self.G.shape[0])
         log.debug(f'I|m=\n{D_rref}')
 
-        return GF2Matrix.from_list(D_rref[:self.G.shape[0],self.G.shape[0]:].flatten())
+        return GF2Matrix.from_list(D_rref[:self.G.shape[0], self.G.shape[0]:].flatten())
 
     def decrypt(self, msg_arr):
         if len(msg_arr) != self.H.shape[1]:
