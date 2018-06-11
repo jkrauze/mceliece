@@ -46,7 +46,7 @@ def generate(m, n, t, priv_key_file, pub_key_file):
     log.info(f'Public key saved to {pub_key_file} file')
 
 
-def encrypt(pub_key_file, input_arr, bin_output=False, block=False):
+def encrypt(pub_key_file, input_arr, block=False):
     pub_key = np.load(pub_key_file)
     mceliece = McElieceCipher(int(pub_key['m']), int(pub_key['n']), int(pub_key['t']))
     mceliece.Gp = pub_key['Gp']
@@ -56,25 +56,22 @@ def encrypt(pub_key_file, input_arr, bin_output=False, block=False):
             raise Exception(f"Input is too large for current N. Should be {mceliece.Gp.shape[0]}")
         output = mceliece.encrypt(input_arr).to_numpy()
     else:
-        input_arr = padding_encode(input_arr, ntru.N)
-        input_arr = input_arr.reshape((-1, ntru.N))
+        input_arr = padding_encode(input_arr, mceliece.Gp.shape[0])
+        input_arr = input_arr.reshape((-1, mceliece.Gp.shape[0]))
         output = np.array([])
         block_count = input_arr.shape[0]
         for i, b in enumerate(input_arr, start=1):
             log.info("Processing block {} out of {}".format(i, block_count))
-            next_output = (ntru.encrypt(Poly(b[::-1], x).set_domain(ZZ),
-                                        random_poly(ntru.N, int(math.sqrt(ntru.q)))).all_coeffs()[::-1])
-            if len(next_output) < ntru.N:
-                next_output = np.pad(next_output, (0, ntru.N - len(next_output)), 'constant')
+            next_output = mceliece.encrypt(b).to_numpy()
+            if len(next_output) < mceliece.Gp.shape[1]:
+                log.debug(f"Padding added in block {i}")
+                next_output = np.pad(next_output, (0, mceliece.Gp.shape[1] - len(next_output)), 'constant')
             output = np.concatenate((output, next_output))
 
-    if bin_output:
-        k = int(math.log2(ntru.q))
-        output = [[0 if c == '0' else 1 for c in np.binary_repr(n, width=k)] for n in output]
     return np.array(output).flatten()
 
 
-def decrypt(priv_key_file, input_arr, bin_input=False, block=False):
+def decrypt(priv_key_file, input_arr, block=False):
     priv_key = np.load(priv_key_file)
     mceliece = McElieceCipher(int(priv_key['m']), int(priv_key['n']), int(priv_key['t']))
     mceliece.S = priv_key['S']
@@ -86,29 +83,25 @@ def decrypt(priv_key_file, input_arr, bin_input=False, block=False):
     mceliece.g_poly = priv_key['g_poly']
     mceliece.irr_poly = priv_key['irr_poly']
 
-
-    if bin_input:
-        k = int(math.log2(ntru.q))
-        pad = k - len(input_arr) % k
-        if pad == k:
-            pad = 0
-        input_arr = np.array([int("".join(n.astype(str)), 2) for n in
-                              np.pad(np.array(input_arr), (0, pad), 'constant').reshape((-1, k))])
     if not block:
         if len(input_arr) < mceliece.H.shape[1]:
             input_arr = np.pad(input_arr, (0, mceliece.H.shape[1] - len(input_arr)), 'constant')
         return mceliece.decrypt(input_arr)
 
-    input_arr = input_arr.reshape((-1, ntru.N))
+    if len(input_arr)%mceliece.H.shape[1] > 0:
+        input_arr = np.pad(input_arr, (0, mceliece.H.shape[1] - len(input_arr)%mceliece.H.shape[1]), 'constant')
+    input_arr = input_arr.reshape((-1, mceliece.H.shape[1]))
     output = np.array([])
     block_count = input_arr.shape[0]
     for i, b in enumerate(input_arr, start=1):
         log.info("Processing block {} out of {}".format(i, block_count))
-        next_output = ntru.decrypt(Poly(b[::-1], x).set_domain(ZZ)).all_coeffs()[::-1]
-        if len(next_output) < ntru.N:
-            next_output = np.pad(next_output, (0, ntru.N - len(next_output)), 'constant')
+        log.debug(f"msg:{b}")
+        next_output = mceliece.decrypt(b)
+        if len(next_output) < mceliece.G.shape[0]:
+            log.debug(f"Padding added in block {i}")
+            next_output = np.pad(next_output, (0, mceliece.H.shape[1] - len(next_output)), 'constant')
         output = np.concatenate((output, next_output))
-    return padding_decode(output, ntru.N)
+    return padding_decode(output.flatten(), mceliece.G.shape[0])
 
 
 if __name__ == '__main__':
@@ -149,9 +142,9 @@ if __name__ == '__main__':
     if args['gen']:
         generate(int(args['M']), int(args['N']), int(args['T']), args['PRIV_KEY_FILE'], args['PUB_KEY_FILE'])
     elif args['enc']:
-        output = encrypt(args['PUB_KEY_FILE'], input_arr, bin_output=not poly_output, block=block)
+        output = encrypt(args['PUB_KEY_FILE'], input_arr, block=block)
     elif args['dec']:
-        output = decrypt(args['PRIV_KEY_FILE'], input_arr, bin_input=not poly_input, block=block)
+        output = decrypt(args['PRIV_KEY_FILE'], input_arr, block=block)
 
     if not args['gen']:
         if poly_output:
