@@ -233,6 +233,29 @@ def ext_euclid_poly(a, b, ring):
     return (x2, y2, a)
 
 
+def ext_euclid_poly_alt(a, b, ring, t):
+    if b.degree() > a.degree():
+        (x, y, d) = ext_euclid_poly_alt(b, a, ring, t)
+        return (y, x, d)
+    if b.is_zero():
+        return (GF2mPoly.from_elem(ring.one()),
+                GF2mPoly.from_elem(ring.zero()),
+                a)
+
+    x1, x2, y1, y2 = GF2mPoly.from_elem(ring.zero()), \
+                     GF2mPoly.from_elem(ring.one()), \
+                     GF2mPoly.from_elem(ring.one()), \
+                     GF2mPoly.from_elem(ring.zero())
+    while not a.degree() <= t // 2 or not x2.degree() <= (t - 1) // 2:
+        q, r = divmod(a, b)
+        x = x2 - q * x1
+        y = y2 - q * y1
+        a, b, x2, x1, y2, y1 = b, r, x1, x, y1, y
+        log.debug(f"ext euclid: {(x2, y2, a)} B:{b}")
+
+    return (x2, y2, a)
+
+
 def rref(arr, steps=None):
     m = len(arr)
     n = len(arr[0])

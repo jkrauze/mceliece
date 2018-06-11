@@ -23,6 +23,7 @@ class McElieceCipher:
         self.S_inv = None
         self.Gp = None
         self.g_poly = None
+        self.irr_poly = None
 
     def generate_random_keys(self):
         self.G, self.H, self.g_poly, self.irr_poly = GoppaCodeGenerator(self.m, self.n, self.t).gen()
@@ -50,9 +51,11 @@ class McElieceCipher:
         return Cp
 
     def repair_errors(self, msg_arr, syndrome):
-        self.irr_poly = GF2Poly.from_numpy(self.irr_poly)
-        ring = GF2mRing(4, self.irr_poly)
-        self.g_poly = GF2mPoly.from_list(
+        if type(self.irr_poly) != GF2Poly:
+            self.irr_poly = GF2Poly.from_numpy(self.irr_poly)
+        ring = GF2mRing(self.m, self.irr_poly)
+        if type(self.g_poly) != GF2mPoly:
+            self.g_poly = GF2mPoly.from_list(
             [GF2m(GF2Poly.from_list([int(e) for e in coeff]), ring) for coeff in self.g_poly])
         log.debug(f'irr_poly:{self.irr_poly}')
         log.debug(f'g_poly:{self.g_poly}')
@@ -89,9 +92,7 @@ class McElieceCipher:
             log.debug(f'R:{R}')
             log.debug(f'R^2 mod g:{(R**2)%self.g_poly}')
 
-            b, _, a = ext_euclid_poly(R, self.g_poly, ring)
-
-            print(ext_euclid_poly(b, self.g_poly, ring))
+            b, _, a = ext_euclid_poly_alt(R, self.g_poly, ring, self.t)
 
             log.debug(f'a:{a};b:{b}')
             log.debug(f'a**2:{a**2};b**2:{b**2};z*b**2:{GF2mPoly.x(ring)*b**2}')
@@ -112,6 +113,8 @@ class McElieceCipher:
         return msg_arr
 
     def decode(self, msg_arr):
+        if type(msg_arr) != GF2Matrix:
+            msg_arr = GF2Matrix.from_list(msg_arr)
         log.debug(f'msg_len:{len(msg_arr)}')
         syndrome = msg_arr * GF2Matrix.from_list(self.H.T)
         log.info(f'syndrome:\n{syndrome}')
