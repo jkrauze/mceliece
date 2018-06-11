@@ -215,7 +215,7 @@ def ext_euclid_poly(a, b, ring):
         (x, y, d) = ext_euclid_poly(b, a, ring)
         return (y, x, d)
 
-    if b.degree() == 0:
+    if b.is_zero():
         return (GF2mPoly.from_elem(ring.one()),
                 GF2mPoly.from_elem(ring.zero()),
                 a)

@@ -91,10 +91,13 @@ class McElieceCipher:
 
             b, _, a = ext_euclid_poly(R, self.g_poly, ring)
 
+            print(ext_euclid_poly(b, self.g_poly, ring))
+
             log.debug(f'a:{a};b:{b}')
+            log.debug(f'a**2:{a**2};b**2:{b**2};z*b**2:{GF2mPoly.x(ring)*b**2}')
             log.debug(f'b*R mod g:{(b*R)%self.g_poly}')
 
-            tau_poly = a ** 2 + GF2mPoly.x(ring) * b ** 2
+            tau_poly = (a ** 2 + GF2mPoly.x(ring) * b ** 2)
 
         log.debug(f'tau_poly={tau_poly}')
         test_elem = ring.one()
