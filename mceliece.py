@@ -47,7 +47,7 @@ def generate(m, n, t, priv_key_file, pub_key_file):
 
 
 def encrypt(pub_key_file, input_arr, block=False):
-    pub_key = np.load(pub_key_file)
+    pub_key = np.load(pub_key_file, allow_pickle=True)
     mceliece = McElieceCipher(int(pub_key['m']), int(pub_key['n']), int(pub_key['t']))
     mceliece.Gp = pub_key['Gp']
 
@@ -72,7 +72,7 @@ def encrypt(pub_key_file, input_arr, block=False):
 
 
 def decrypt(priv_key_file, input_arr, block=False):
-    priv_key = np.load(priv_key_file)
+    priv_key = np.load(priv_key_file, allow_pickle=True)
     mceliece = McElieceCipher(int(priv_key['m']), int(priv_key['n']), int(priv_key['t']))
     mceliece.S = priv_key['S']
     mceliece.S_inv = priv_key['S_inv']
@@ -105,7 +105,7 @@ def decrypt(priv_key_file, input_arr, block=False):
 
 
 if __name__ == '__main__':
-    args = docopt(__doc__, version='NTRU v0.1')
+    args = docopt(__doc__, version='McEliece v0.1')
     root = logging.getLogger()
     root.setLevel(logging.DEBUG)
     ch = logging.StreamHandler(sys.stdout)
